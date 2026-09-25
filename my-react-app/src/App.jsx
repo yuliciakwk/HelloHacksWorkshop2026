@@ -9,16 +9,51 @@ const pokemonTypes = [
 
 function App() {
   const [selectedType, setSelectedType] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
-  function getMatchup(type) {
-  // API CALL WILL GO HERE, AND WE WILL RETURN THE RESPONSE
-  return `Fake API response: You are fighting a ${type}-type Pokémon.`;
-}
+  async function getMatchup(type) {
+    try {
+      const response = await fetch(
+        `http://localhost:5001/api/type/${encodeURIComponent(type.toLowerCase())}`,
+      )
 
-function handleTypeClick(type) {
-  const response = getMatchup(type);
-  setSelectedType(response);
-}
+      if (!response.ok) {
+        throw new Error(`Failed to fetch matchup (${response.status})`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('Unable to get matchup:', error)
+      return null
+    }
+  }
+
+  async function handleTypeClick(type) {
+    setIsLoading(true)
+    setSelectedType('Loading matchup…')
+    const response = await getMatchup(type)
+
+    if (response) {
+      const formatTypes = (types) => types
+        .map((name) => name.charAt(0).toUpperCase() + name.slice(1))
+        .join(', ')
+
+      const attackAdvice = response.double_damage_from.length
+        ? `Attack with these move types for double damage: ${formatTypes(response.double_damage_from)}.`
+        : 'No move type deals double damage against this type.'
+
+      const defenseAdvice = response.half_damage_to.length
+        ? `These Pokémon types take half damage from ${type}-type moves: ${formatTypes(response.half_damage_to)}.`
+        : `No Pokémon type takes half damage from ${type}-type moves.`
+
+      setSelectedType(
+        `Facing a ${type}-type Pokémon!\n\n${attackAdvice}\n\n${defenseAdvice}\n\nThese matchups assume a single type. A second type can change the damage.`,
+      )
+    } else {
+      setSelectedType('Unable to load matchup. Please try again.')
+    }
+    setIsLoading(false)
+  }
 
   return (
     <main className="flex min-h-svh items-center justify-center px-5 py-12">
@@ -42,15 +77,16 @@ function handleTypeClick(type) {
             <button
               key={name}
               type="button"
-              onClick={() => handleTypeClick(type.name)}
-              className={`flex min-h-20 cursor-pointer items-center gap-3 rounded-xl border px-4 py-5 text-left font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-800 ${styles}`}
+              onClick={() => handleTypeClick(name)}
+              disabled={isLoading}
+              className={`flex min-h-20 cursor-pointer items-center gap-3 rounded-xl border px-4 py-5 text-left font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-800 disabled:cursor-wait disabled:opacity-60 ${styles}`}
             >
               <span aria-hidden="true" className="text-xl">{symbol}</span>
               {name}
             </button>
           ))}
         </div>
-        <p aria-live="polite" className="mt-4 text-slate-600">{selectedType}</p>
+        <p aria-live="polite" className="mt-4 whitespace-pre-line text-slate-600">{selectedType}</p>
       </section>
     </main>
   )
